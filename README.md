@@ -1,3 +1,14 @@
+---
+title: Document Q&A Chatbot
+emoji: 📄
+colorFrom: yellow
+colorTo: orange
+sdk: gradio
+sdk_version: 5.12.0
+app_file: app.py
+pinned: false
+---
+
 # Document Q&A Chatbot
 
 [![Live Demo](https://img.shields.io/badge/Live%20Demo-HuggingFace%20Spaces-blue)](https://huggingface.co/spaces/davidleocadio94DLAI/langchain-chat-with-your-data_document-qa-chatbot)
