@@ -2,7 +2,7 @@
 title: Document Q&A Chatbot
 emoji: 📄
 colorFrom: yellow
-colorTo: orange
+colorTo: yellow
 sdk: gradio
 sdk_version: 5.12.0
 app_file: app.py
