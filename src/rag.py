@@ -5,8 +5,9 @@ from langchain_community.document_loaders import PyPDFLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_openai import OpenAIEmbeddings, ChatOpenAI
 from langchain_community.vectorstores import Chroma
-from langchain.chains import ConversationalRetrievalChain
-from langchain.memory import ConversationBufferMemory
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.output_parsers import StrOutputParser
+from langchain_core.runnables import RunnablePassthrough
 
 
 class DocumentQA:
@@ -14,12 +15,9 @@ class DocumentQA:
 
     def __init__(self):
         self.vectordb = None
-        self.qa_chain = None
-        self.memory = ConversationBufferMemory(
-            memory_key="chat_history",
-            return_messages=True,
-            output_key="answer"
-        )
+        self.retriever = None
+        self.llm = None
+        self.chat_history = []
 
     def load_and_process_pdf(self, pdf_path: str) -> str:
         """Load a PDF and create vector store."""
@@ -42,28 +40,60 @@ class DocumentQA:
             embedding=embedding,
         )
 
-        # Create QA chain
-        llm = ChatOpenAI(model_name="gpt-3.5-turbo", temperature=0)
-        self.qa_chain = ConversationalRetrievalChain.from_llm(
-            llm,
-            retriever=self.vectordb.as_retriever(),
-            memory=self.memory,
-            return_source_documents=True
-        )
+        # Set up retriever and LLM
+        self.retriever = self.vectordb.as_retriever()
+        self.llm = ChatOpenAI(model_name="gpt-3.5-turbo", temperature=0)
 
         return f"Loaded {len(docs)} pages, created {len(splits)} chunks"
 
     def ask_question(self, question: str) -> tuple[str, list]:
         """Ask a question about the loaded document."""
-        if not self.qa_chain:
+        if not self.retriever:
             return "Please upload a PDF document first.", []
 
-        result = self.qa_chain({"question": question})
-        answer = result["answer"]
+        # Retrieve relevant documents
+        docs = self.retriever.invoke(question)
+
+        # Format context from retrieved documents
+        context = "\n\n".join([doc.page_content for doc in docs])
+
+        # Format chat history
+        history_str = ""
+        for h in self.chat_history[-5:]:  # Keep last 5 exchanges
+            history_str += f"Human: {h['question']}\nAssistant: {h['answer']}\n"
+
+        # Create prompt
+        prompt = ChatPromptTemplate.from_template("""
+        Answer the question based on the following context and chat history.
+        If you cannot find the answer in the context, say so.
+
+        Context:
+        {context}
+
+        Chat History:
+        {history}
+
+        Question: {question}
+
+        Answer:
+        """)
+
+        # Create chain
+        chain = prompt | self.llm | StrOutputParser()
+
+        # Get answer
+        answer = chain.invoke({
+            "context": context,
+            "history": history_str,
+            "question": question
+        })
+
+        # Store in history
+        self.chat_history.append({"question": question, "answer": answer})
 
         # Extract source info
         sources = []
-        for doc in result.get("source_documents", [])[:3]:
+        for doc in docs[:3]:
             page = doc.metadata.get("page", "?")
             preview = doc.page_content[:200] + "..."
             sources.append(f"Page {page}: {preview}")
@@ -72,7 +102,7 @@ class DocumentQA:
 
     def clear_memory(self):
         """Clear conversation memory."""
-        self.memory.clear()
+        self.chat_history = []
         return "Conversation memory cleared."
 
 

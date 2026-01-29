@@ -60,7 +60,23 @@ cp .env.example .env
 ### Run Locally
 
 ```bash
+# Set your API key
+export OPENAI_API_KEY=your-api-key
+
+# Run the app
 python app.py
+```
+
+Open http://localhost:7860 in your browser.
+
+### Run with Docker
+
+```bash
+# Build the image
+docker build -t document-qa-chatbot .
+
+# Run the container
+docker run -p 7860:7860 -e OPENAI_API_KEY=your-api-key document-qa-chatbot
 ```
 
 Open http://localhost:7860 in your browser.
